@@ -61,19 +61,6 @@ RUN chmod +x /usr/local/bin/optimize.sh
 ADD optimize_workspace.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/optimize_workspace.sh
 
-# Being required for gcc linking of build_workspace
-RUN apk add --no-cache musl-dev
-
-ADD build_workspace build_workspace
-RUN cd build_workspace && \
-  echo "Installed targets:" && (rustup target list | grep installed) && \
-  export DEFAULT_TARGET="$(rustc -vV | grep 'host:' | cut -d' ' -f2)" && echo "Default target: $DEFAULT_TARGET" && \
-  # Those RUSTFLAGS reduce binary size from 4MB to 600 KB
-  RUSTFLAGS='-C link-arg=-s' cargo build --release && \
-  ls -lh target/release/build_workspace && \
-  (ldd target/release/build_workspace || true) && \
-  mv target/release/build_workspace /usr/local/bin
-
 #
 # base-optimizer
 #
@@ -81,7 +68,7 @@ FROM rust:1.64.0-alpine as base-optimizer
 
 # Being required for gcc linking
 RUN apk update && \
-  apk add --no-cache musl-dev
+  apk add --no-cache musl-dev jq
 
 # Setup Rust with Wasm support
 RUN rustup target add wasm32-unknown-unknown
@@ -118,7 +105,6 @@ WORKDIR /code
 
 # Add script as entry point
 COPY --from=builder /usr/local/bin/optimize_workspace.sh /usr/local/bin
-COPY --from=builder /usr/local/bin/build_workspace /usr/local/bin
 
 ENTRYPOINT ["optimize_workspace.sh"]
 # Default argument when none is provided

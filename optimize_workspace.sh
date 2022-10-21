@@ -18,8 +18,31 @@ cargo --version
 rm -f target/wasm32-unknown-unknown/release/*.wasm
 
 # Build artifacts
+
+feat_location="/code/features.json"
+get_features() {
+  set -e
+  if [ -f "$feat_location" ]; then
+    jq -r ".\"$1\" | select(. != null)" <"$feat_location"
+  fi
+  return 0
+}
+
 echo "Building artifacts in workspace..."
-/usr/local/bin/build_workspace
+
+ws_members="$(cargo metadata --no-deps --locked --format-version 1 |
+  jq -r ".packages[] | select(.manifest_path | startswith(\"$PWD/contracts\")) | .name")"
+echo -e "Contracts to be built:\n$ws_members"
+for member in $ws_members; do
+  features="$(get_features "$member")"
+  if [ -n "$features" ]; then
+    echo "Building $member with enabled features: $features ..."
+    RUSTFLAGS='-C link-arg=-s' cargo build -p "$member" --release --features "$features" --lib --target wasm32-unknown-unknown --locked
+  else
+    echo "Building $member ..."
+    RUSTFLAGS='-C link-arg=-s' cargo build -p "$member" --release --lib --target wasm32-unknown-unknown --locked
+  fi
+done
 
 mkdir -p artifacts
 echo "Optimizing artifacts in workspace..."
