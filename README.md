@@ -91,6 +91,17 @@ docker run --rm -v "$(pwd)":/code \
   cosmwasm/rust-optimizer:0.12.9 ./contracts/burner
 ```
 
+## Crate features support
+
+It is possible to build crates with features enabled. Place features.json within root dir.
+Example:
+```json
+{
+  "burner": "testnet",
+  "hackatom": "ibc3"
+}
+```
+
 ## Development
 
 Take a look at the [Makefile](https://github.com/CosmWasm/rust-optimizer/blob/master/Makefile)

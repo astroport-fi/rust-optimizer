@@ -18,8 +18,49 @@ cargo --version
 rm -f target/wasm32-unknown-unknown/release/*.wasm
 
 # Build artifacts
+
+feat_location="/code/features.json"
+get_features() {
+  set -e
+  if [ -f "$feat_location" ]; then
+    jq -r ".\"$1\" | select(. != null)" <"$feat_location"
+  fi
+  return 0
+}
+
+get_path() {
+  set -e
+  local toml_path
+  toml_path="$(
+    cargo metadata --no-deps --locked --format-version 1 |
+      jq -r ".packages[] | select(.name == \"$1\") | .manifest_path"
+  )"
+  dirname "$toml_path"
+  return 0
+}
+
 echo "Building artifacts in workspace..."
-/usr/local/bin/build_workspace
+
+ws_members="$(cargo metadata --no-deps --locked --format-version 1 |
+  jq -r ".packages[] | select(.manifest_path | startswith(\"$PWD/contracts\")) | .name")"
+echo -e "Contracts to be built:\n$ws_members"
+for member in $ws_members; do
+  features="$(get_features "$member")"
+  crate_path="$(get_path "$member")"
+  if [ -n "$features" ]; then
+    echo "Building $member with enabled features: $features ..."
+    (
+      cd "$crate_path"
+      RUSTFLAGS='-C link-arg=-s' cargo build --release --features "$features" --lib --target wasm32-unknown-unknown --locked
+    )
+  else
+    echo "Building $member ..."
+    (
+      cd "$crate_path"
+      RUSTFLAGS='-C link-arg=-s' cargo build --release --lib --target wasm32-unknown-unknown --locked
+    )
+  fi
+done
 
 mkdir -p artifacts
 echo "Optimizing artifacts in workspace..."
@@ -77,5 +118,10 @@ echo "Post-processing artifacts in workspace..."
   cd artifacts
   sha256sum -- *.wasm | tee checksums.txt
 )
+if [ -f "$feat_location" ]; then
+  echo "Check features enabled for contracts:"
+  cat "$feat_location"
+  echo
+fi
 
 echo "done"
