@@ -77,30 +77,9 @@ pub fn build_workspace(workspace_members: &[String]) {
             .build_variants
             .unwrap_or_default();
 
-        let mut child = Command::new(CARGO_PATH)
-            .args(&[
-                "build",
-                "--target-dir=/target",
-                "--release",
-                "--lib",
-                "--target=wasm32-unknown-unknown",
-                "--locked",
-            ])
-            .env("RUSTFLAGS", "-C link-arg=-s")
-            .current_dir(canonicalize(contract).unwrap())
-            .spawn()
-            .unwrap();
-        let error_code = child.wait().unwrap();
-        assert!(error_code.success());
-
         if variants.len() > 0 {
-            fs::copy(
-                build_dir.join(format!("{name}.wasm")),
-                build_dir.join(format!("{name}_default.wasm")),
-            )
-            .unwrap();
             for variant in variants {
-                Command::new(CARGO_PATH)
+                let mut child = Command::new(CARGO_PATH)
                     .args(&[
                         "build",
                         "--target-dir=/target",
@@ -127,6 +106,22 @@ pub fn build_workspace(workspace_members: &[String]) {
                 .unwrap();
             }
         }
+
+        let mut child = Command::new(CARGO_PATH)
+            .args(&[
+                "build",
+                "--target-dir=/target",
+                "--release",
+                "--lib",
+                "--target=wasm32-unknown-unknown",
+                "--locked",
+            ])
+            .env("RUSTFLAGS", "-C link-arg=-s")
+            .current_dir(canonicalize(contract).unwrap())
+            .spawn()
+            .unwrap();
+        let error_code = child.wait().unwrap();
+        assert!(error_code.success());
     }
 }
 
